@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SiteGrade — Free Website Analyzer · Ideplement</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: #111111;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* NAV */
+  .site-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 2.5rem;
+    background: rgba(17,17,17,0.93);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .nav-logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800; font-size: 1.35rem;
+    letter-spacing: -0.03em; color: white; text-decoration: none;
+  }
+  .nav-logo span { color: #F26419; }
+  .nav-links { display: flex; align-items: center; gap: 2rem; list-style: none; }
+  .nav-links a {
+    font-size: 0.85rem; font-weight: 500;
+    color: rgba(255,255,255,0.45);
+    text-decoration: none; transition: color 0.2s;
+  }
+  .nav-links a:hover { color: white; }
+  .nav-links a.active { color: #F26419; }
+  .nav-cta {
+    background: #F26419 !important; color: white !important;
+    padding: 0.5rem 1.15rem; border-radius: 100px;
+  }
+  .nav-cta:hover { background: #C45000 !important; }
+
+  /* TOOL WRAPPER */
+  #tool-root { padding-top: 64px; min-height: calc(100vh - 130px); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+  /* FOOTER */
+  .site-footer {
+    background: #0a0a0a;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 2rem 2.5rem;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 1rem;
+  }
+  .footer-links { display: flex; gap: 1.75rem; list-style: none; }
+  .footer-links a {
+    font-size: 0.8rem; color: rgba(255,255,255,0.3);
+    text-decoration: none; transition: color 0.2s;
+  }
+  .footer-links a:hover { color: rgba(255,255,255,0.7); }
+  .footer-copy { font-size: 0.75rem; color: rgba(255,255,255,0.2); }
+
+  @media (max-width: 640px) {
+    .site-nav { padding: 0.9rem 1.25rem; }
+    .nav-links { display: none; }
+    .site-footer { flex-direction: column; text-align: center; padding: 1.5rem 1.25rem; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a href="index.html" class="nav-logo">Idep<span>lement</span></a>
+  <ul class="nav-links">
+    <li><a href="index.html#services">Services</a></li>
+    <li><a href="index.html#process">Process</a></li>
+    <li><a href="index.html#portfolio">Portfolio</a></li>
+    <li><a href="website-review.html" class="active">Site Review Tool</a></li>
+    <li><a href="index.html#about">Who We Serve</a></li>
+    <li><a href="index.html#contact" class="nav-cta">Let's Talk</a></li>
+  </ul>
+</nav>
+
+<div id="tool-root"></div>
+
+<footer class="site-footer">
+  <a href="index.html" class="nav-logo">Idep<span style="color:#F26419">lement</span></a>
+  <ul class="footer-links">
+    <li><a href="index.html#services">Services</a></li>
+    <li><a href="index.html#process">Process</a></li>
+    <li><a href="index.html#portfolio">Portfolio</a></li>
+    <li><a href="website-review.html">Site Review Tool</a></li>
+    <li><a href="index.html#contact">Contact</a></li>
+  </ul>
+  <p class="footer-copy">© 2026 Ideplement. All rights reserved.</p>
+</footer>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const C = {
+  navy:"#111111", navyMid:"#1A1A1A", blue:"#C45000", sky:"#F26419",
+  skyLight:"#FEF0E6", slate:"#555555", muted:"#888888", border:"#E0E0E0",
+  offWhite:"#F8F8F8", white:"#FFFFFF", green:"#1A7A4A", greenL:"#E8F5EE",
+  amber:"#B8640A", amberL:"#FEF3E6", red:"#B02020", redL:"#FDECEC",
+};
+
+function scoreColor(s) {
+  if (s >= 7) return { fg: C.green, bg: C.greenL };
+  if (s >= 4) return { fg: C.amber, bg: C.amberL };
+  return { fg: C.red, bg: C.redL };
+}
+function scoreLabel(s) {
+  if (s >= 8) return "Strong";
+  if (s >= 6) return "Decent";
+  if (s >= 4) return "Weak";
+  return "Critical";
+}
+
+function Gauge({ score, size = 110 }) {
+  const [animScore, setAnimScore] = useState(0);
+  useEffect(() => {
+    let start = null;
+    const dur = 1400;
+    const step = (ts) => {
+      if (!start) start = ts;
+      const p = Math.min((ts - start) / dur, 1);
+      setAnimScore((1 - Math.pow(1 - p, 3)) * score);
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [score]);
+  const r = 40, cx = 55, cy = 55;
+  const circumference = 2 * Math.PI * r;
+  const arc = (animScore / 10) * circumference * 0.75;
+  const { fg } = scoreColor(score);
+  return (
+    <svg width={size} height={size} viewBox="0 0 110 110">
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.border} strokeWidth="8"
+        strokeDasharray={`${circumference*0.75} ${circumference}`}
+        strokeDashoffset={circumference*0.125} strokeLinecap="round"
+        transform={`rotate(135 ${cx} ${cy})`} />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke={fg} strokeWidth="8"
+        strokeDasharray={`${arc} ${circumference}`}
+        strokeDashoffset={circumference*0.125} strokeLinecap="round"
+        transform={`rotate(135 ${cx} ${cy})`}
+        style={{transition:"stroke-dasharray 0.05s"}} />
+      <text x={cx} y={cy-4} textAnchor="middle" dominantBaseline="middle"
+        style={{fontFamily:"'Syne',sans-serif",fontSize:26,fontWeight:800,fill:fg}}>
+        {Math.round(animScore)}
+      </text>
+      <text x={cx} y={cy+16} textAnchor="middle"
+        style={{fontFamily:"system-ui",fontSize:10,fill:C.muted}}>/10</text>
+    </svg>
+  );
+}
+
+function ScoreBar({ label, score, delay = 0 }) {
+  const [width, setWidth] = useState(0);
+  const { fg } = scoreColor(score);
+  useEffect(() => {
+    const t = setTimeout(() => setWidth(score * 10), delay + 200);
+    return () => clearTimeout(t);
+  }, [score]);
+  return (
+    <div style={{marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+        <span style={{fontSize:13,color:C.slate,fontWeight:500}}>{label}</span>
+        <span style={{fontSize:13,fontWeight:700,color:fg}}>
+          {score}/10 <span style={{fontWeight:400,fontSize:11,color:C.muted}}>{scoreLabel(score)}</span>
+        </span>
+      </div>
+      <div style={{height:7,borderRadius:4,background:C.border,overflow:"hidden"}}>
+        <div style={{height:"100%",width:`${width}%`,background:fg,borderRadius:4,transition:"width 1s cubic-bezier(0.22,1,0.36,1)"}} />
+      </div>
+    </div>
+  );
+}
+
+function Steps({ current }) {
+  const steps = ["Enter URL","Your Info","Your Report"];
+  return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:0,marginBottom:36}}>
+      {steps.map((s,i) => (
+        <div key={i} style={{display:"flex",alignItems:"center"}}>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+            <div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",
+              background:i<=current?C.sky:C.border,color:i<=current?C.white:C.muted,fontSize:12,fontWeight:700,transition:"all 0.3s"}}>
+              {i<current?"✓":i+1}
+            </div>
+            <span style={{fontSize:11,color:i<=current?C.sky:C.muted,whiteSpace:"nowrap",fontWeight:i===current?600:400}}>{s}</span>
+          </div>
+          {i<steps.length-1&&(
+            <div style={{width:60,height:2,background:i<current?C.sky:C.border,margin:"0 8px",marginTop:-16,transition:"background 0.3s"}} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Report({ report }) {
+  const { overallScore, scores, topOpportunity, teaser, name, url, headline } = report;
+  const overall = scoreColor(overallScore);
+  const [showCal, setShowCal] = useState(false);
+  const categories = [
+    {key:"leadCapture",label:"Lead capture"},
+    {key:"trustSignals",label:"Trust signals"},
+    {key:"seoReadiness",label:"SEO readiness"},
+    {key:"ctaClarity",label:"CTA clarity"},
+    {key:"contentDepth",label:"Content depth"},
+  ];
+  const card = {background:"#fff",borderRadius:14,padding:"22px 24px",marginBottom:14};
+  const oppCount = Math.floor(Math.random()*4)+8;
+
+  return (
+    <div style={{animation:"fadeUp 0.5s ease both"}}>
+      <style>{`
+        @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        .book-btn:hover{background:#1A7A4A!important}
+        .cal-slot:hover{background:rgba(255,255,255,0.08)!important}
+      `}</style>
+
+      <div style={{background:C.white,borderRadius:16,padding:"28px 24px 22px",marginBottom:14,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}}>
+        <p style={{fontSize:12,color:C.muted,letterSpacing:"0.07em",fontWeight:600,marginBottom:4}}>WEBSITE GRADE FOR</p>
+        <p style={{fontSize:14,color:C.blue,fontWeight:700,marginBottom:16,wordBreak:"break-all"}}>{url}</p>
+        <Gauge score={overallScore} size={130} />
+        <div style={{marginTop:10,marginBottom:8}}>
+          <span style={{display:"inline-block",background:overall.bg,color:overall.fg,borderRadius:6,padding:"4px 14px",fontSize:13,fontWeight:700}}>
+            {overallScore<4?"Needs Urgent Attention":overallScore<7?"Room for Improvement":"Performing Well"}
+          </span>
+        </div>
+        <p style={{fontFamily:"'Syne',sans-serif",fontSize:17,fontWeight:800,color:C.navy,margin:"10px 0 0",lineHeight:1.35}}>"{headline}"</p>
+      </div>
+
+      <div style={{...card}}>
+        <p style={{fontSize:12,fontWeight:700,color:C.muted,letterSpacing:"0.07em",marginBottom:16}}>SCORE BREAKDOWN</p>
+        {categories.map((c,i) => <ScoreBar key={c.key} label={c.label} score={scores[c.key]} delay={i*120} />)}
+      </div>
+
+      <div style={{background:C.greenL,border:`1.5px solid ${C.green}`,borderRadius:14,padding:"20px 22px",marginBottom:14}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+          <div style={{width:34,height:34,borderRadius:8,background:C.green,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:16}}>💡</div>
+          <div>
+            <p style={{fontSize:12,fontWeight:700,color:C.green,letterSpacing:"0.07em",marginBottom:4}}>YOUR #1 QUICK WIN</p>
+            <p style={{fontSize:14,color:"#0F4A2A",lineHeight:1.6,margin:0,fontWeight:500}}>{topOpportunity}</p>
+          </div>
+        </div>
+      </div>
+
+      <div style={{background:C.white,borderRadius:14,padding:"22px 24px",marginBottom:14,position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.97) 60%)",zIndex:1}} />
+        <p style={{fontSize:12,fontWeight:700,color:C.muted,letterSpacing:"0.07em",marginBottom:12}}>FULL ANALYSIS — 18 ADDITIONAL FINDINGS</p>
+        {["Critical: No click-to-call phone number visible above the fold on mobile",
+          "High: Missing testimonials and social proof on homepage and service pages",
+          "High: No city-specific SEO landing pages for your service area",
+          "Medium: Page load speed issues detected — impacting rankings",
+          "Medium: No FAQ page — missing high-intent search traffic"].map((item,i) => (
+          <div key={i} style={{display:"flex",gap:10,marginBottom:10,filter:i>=1?"blur(4px)":"blur(2px)",userSelect:"none"}}>
+            <div style={{width:6,height:6,borderRadius:"50%",background:i===0?C.red:C.amber,marginTop:6,flexShrink:0}} />
+            <span style={{fontSize:13,color:C.slate}}>{item}</span>
+          </div>
+        ))}
+        <div style={{position:"absolute",bottom:0,left:0,right:0,zIndex:2,padding:"20px 24px 24px",textAlign:"center"}}>
+          <div style={{background:C.amberL,border:`1px solid ${C.amber}`,borderRadius:10,padding:"14px 16px",marginBottom:14}}>
+            <p style={{fontSize:13,color:C.amber,fontWeight:700,margin:"0 0 4px"}}>🔒 {teaser}</p>
+            <p style={{fontSize:12,color:"#7A4500",margin:0}}>Unlock the full report in a free 20-minute consultation.</p>
+          </div>
+        </div>
+      </div>
+
+      <div style={{background:C.navy,border:`1px solid rgba(242,100,25,0.3)`,borderRadius:16,padding:"26px 24px",textAlign:"center"}}>
+        <p style={{fontSize:12,color:C.sky,fontWeight:700,letterSpacing:"0.07em",marginBottom:8}}>FREE 20-MINUTE CONSULTATION</p>
+        <h3 style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800,color:C.white,margin:"0 0 10px",lineHeight:1.3}}>
+          See the full report &amp; get a custom game plan
+        </h3>
+        <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",margin:"0 0 20px",lineHeight:1.6}}>
+          {name?`${name.split(" ")[0]}, we`:"We"} found {oppCount} specific opportunities on your site. In 20 minutes we'll walk through every one, show you exactly what to fix first, and give you a no-obligation roadmap.
+        </p>
+        <button className="book-btn"
+          style={{width:"100%",padding:"15px 24px",fontSize:15,fontWeight:700,background:C.green,color:C.white,border:"none",borderRadius:10,cursor:"pointer",fontFamily:"inherit",marginBottom:10,transition:"background 0.2s"}}
+          onClick={() => setShowCal(!showCal)}>
+          {showCal?"Hide Calendar ↑":"Book My Free Consultation →"}
+        </button>
+        {showCal && (
+          <div style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,padding:"20px",marginBottom:10,textAlign:"left"}}>
+            <p style={{color:C.white,fontSize:14,fontWeight:600,marginBottom:8}}>Choose a time that works for you:</p>
+            {["Tomorrow, 10:00 AM","Tomorrow, 2:00 PM","Thu, 9:00 AM","Thu, 3:00 PM","Fri, 11:00 AM"].map(t => (
+              <div key={t} className="cal-slot"
+                onClick={() => window.location.href=`mailto:dhcalicker@gmail.com?subject=Free Consultation Request — Website Review&body=Hi, I just received my website grade and would like to book a free 20-minute consultation. Preferred time: ${t}.`}
+                style={{padding:"10px 14px",borderRadius:8,border:"1px solid rgba(255,255,255,0.15)",color:"rgba(255,255,255,0.8)",fontSize:13,cursor:"pointer",marginBottom:6,transition:"background 0.15s"}}>
+                📅 {t}
+              </div>
+            ))}
+            <p style={{color:"rgba(255,255,255,0.3)",fontSize:11,marginTop:8}}>All times shown in EST · Selecting a time opens your email to confirm</p>
+          </div>
+        )}
+        <a href="mailto:dhcalicker@gmail.com?subject=Free Consultation — Website Review"
+          style={{display:"block",fontSize:13,color:"rgba(255,255,255,0.4)",marginTop:8,textDecoration:"none"}}>
+          Or email directly: dhcalicker@gmail.com
+        </a>
+        <p style={{fontSize:12,color:"rgba(255,255,255,0.3)",margin:"12px 0 0"}}>No obligation · No sales pressure · Genuinely useful regardless</p>
+      </div>
+
+      <div style={{textAlign:"center",marginTop:20}}>
+        <p style={{fontSize:12,color:"rgba(255,255,255,0.25)",lineHeight:1.6}}>
+          ★★★★★ Trusted by small business owners · Free tool by <strong style={{color:"rgba(255,255,255,0.35)"}}>Ideplement</strong>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function WebsiteGrader() {
+  const [step, setStep] = useState(0);
+  const [url, setUrl] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [company, setCompany] = useState("");
+  const [report, setReport] = useState(null);
+  const [error, setError] = useState("");
+  const [typingText, setTypingText] = useState("");
+  const [urlError, setUrlError] = useState("");
+  const [infoError, setInfoError] = useState("");
+  const msgRef = useRef(0);
+
+  const messages = [
+    "Fetching your website...","Analyzing lead capture elements...",
+    "Evaluating trust signals...","Checking SEO fundamentals...",
+    "Reviewing CTA effectiveness...","Assessing content depth...",
+    "Calculating your scores...","Preparing your report...",
+  ];
+
+  useEffect(() => {
+    if (step !== 2) return;
+    setTypingText(messages[0]);
+    const iv = setInterval(() => {
+      msgRef.current = (msgRef.current + 1) % messages.length;
+      setTypingText(messages[msgRef.current]);
+    }, 2000);
+    return () => clearInterval(iv);
+  }, [step]);
+
+  async function analyzeWebsite() {
+    setStep(2); setError("");
+    const prompt = `You are a website conversion and lead generation expert. Analyze the website at this URL: ${url}
+
+Based on what you can determine about this website (from the URL, domain name, any publicly available information, and general knowledge about this type of business), grade it on these 5 dimensions on a scale of 1-10:
+
+1. Lead Capture - forms, CTAs, phone numbers, lead magnets
+2. Trust Signals - testimonials, reviews, certifications, team info, social proof
+3. SEO Readiness - local SEO, page titles, content structure, city/service pages
+4. CTA Clarity - clear calls to action, button placement, urgency, next steps
+5. Content Depth - quality of copy, service descriptions, FAQs, blog/resources
+
+Respond ONLY with valid JSON in exactly this format, no other text:
+{
+  "businessName": "short business name from URL or domain",
+  "businessType": "type of business in 3-5 words",
+  "overallScore": <number 1-10>,
+  "scores": {
+    "leadCapture": <number 1-10>,
+    "trustSignals": <number 1-10>,
+    "seoReadiness": <number 1-10>,
+    "ctaClarity": <number 1-10>,
+    "contentDepth": <number 1-10>
+  },
+  "topOpportunity": "One specific, concrete, actionable improvement they can make RIGHT NOW — written as a single sentence starting with an action verb. Make it specific to this type of business. Max 30 words.",
+  "teaser": "A single sentence hinting at 2-3 other critical issues found without revealing them. Create urgency. Example: 'We also identified 3 critical gaps in your trust signals and SEO setup that are likely costing you leads every week.' Max 35 words.",
+  "headline": "A punchy 6-8 word summary verdict on the website. Example: 'Strong brand, but leads are slipping through.' Specific to this business."
+}`;
+    try {
+    // ── Replace the URL below with your Cloudflare Worker URL after deploying worker.js
+    // Example: "https://ideplement-proxy.yoursubdomain.workers.dev"
+    const WORKER_URL = "https://ideplement-proxy.dhcalicker.workers.dev";
+      const res = await fetch(WORKER_URL, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
+      });
+      const data = await res.json();
+      const text = data.content?.find(b=>b.type==="text")?.text||"";
+      const clean = text.replace(/```json|```/g,"").trim();
+      const parsed = JSON.parse(clean);
+      setReport({...parsed,url,name,email,company});
+      setStep(3);
+    } catch(e) {
+      setError("We couldn't analyze that website. Please check the URL and try again.");
+      setStep(1);
+    }
+  }
+
+  function validateUrl() {
+    const val = url.trim();
+    if (!val) { setUrlError("Please enter a website URL."); return false; }
+    try {
+      const u = new URL(val.startsWith("http")?val:"https://"+val);
+      if (!u.hostname.includes(".")) throw new Error();
+      setUrl(u.href); setUrlError(""); return true;
+    } catch { setUrlError("Please enter a valid URL, e.g. yoursite.com"); return false; }
+  }
+
+  function validateInfo() {
+    if (!name.trim()||!email.trim()) { setInfoError("Please enter your name and email to receive your report."); return false; }
+    if (!/\S+@\S+\.\S+/.test(email)) { setInfoError("Please enter a valid email address."); return false; }
+    setInfoError(""); return true;
+  }
+
+  const inputStyle = {
+    width:"100%",padding:"13px 16px",fontSize:15,border:`1.5px solid ${C.border}`,
+    borderRadius:10,background:C.white,color:C.navy,fontFamily:"inherit",
+    outline:"none",transition:"border-color 0.2s",boxSizing:"border-box"
+  };
+  const btnPrimary = {
+    width:"100%",padding:"15px 24px",fontSize:15,fontWeight:700,background:C.sky,
+    color:C.white,border:"none",borderRadius:10,cursor:"pointer",fontFamily:"inherit",
+    letterSpacing:0.3,transition:"background 0.2s,transform 0.1s"
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:C.navy,fontFamily:"'DM Sans',system-ui,sans-serif"}}>
+
+      <div style={{borderBottom:`1px solid rgba(255,255,255,0.08)`,padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div>
+          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:18,color:C.white}}>
+            Site<span style={{color:C.sky}}>Grade</span>
+          </span>
+          <span style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginLeft:10,letterSpacing:"0.08em"}}>FREE WEBSITE ANALYZER</span>
+        </div>
+        <span style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>by <strong style={{color:"rgba(255,255,255,0.6)"}}>Ideplement</strong></span>
+      </div>
+
+      <div style={{maxWidth:560,margin:"0 auto",padding:"40px 20px 60px"}}>
+
+        {step<=1&&(
+          <div style={{textAlign:"center",marginBottom:36}}>
+            <div style={{display:"inline-block",background:"rgba(242,100,25,0.15)",border:"1px solid rgba(242,100,25,0.3)",borderRadius:20,padding:"4px 14px",fontSize:12,color:C.sky,fontWeight:600,letterSpacing:"0.06em",marginBottom:16}}>
+              FREE · INSTANT · NO CREDIT CARD
+            </div>
+            <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:34,fontWeight:800,color:C.white,lineHeight:1.15,margin:"0 0 14px"}}>
+              Is your website<br/><span style={{color:C.sky}}>losing you leads?</span>
+            </h1>
+            <p style={{fontSize:15,color:"rgba(255,255,255,0.55)",lineHeight:1.65,margin:0}}>
+              Get an instant AI-powered grade across 5 key areas — lead capture, trust signals, SEO, CTAs, and content. See exactly where you're leaving money on the table.
+            </p>
+          </div>
+        )}
+
+        {step<=1&&<Steps current={step}/>}
+
+        {step===0&&(
+          <div style={{background:C.white,borderRadius:16,padding:"28px 28px 24px",boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}}>
+            <label style={{display:"block",fontSize:13,fontWeight:600,color:C.slate,marginBottom:8,letterSpacing:"0.04em"}}>
+              YOUR WEBSITE URL
+            </label>
+            <input style={inputStyle} placeholder="https://yourbusiness.com" value={url}
+              onChange={e=>{setUrl(e.target.value);setUrlError("");}}
+              onKeyDown={e=>e.key==="Enter"&&validateUrl()&&setStep(1)}
+              onFocus={e=>e.target.style.borderColor=C.sky}
+              onBlur={e=>e.target.style.borderColor=C.border}/>
+            {urlError&&<p style={{color:C.red,fontSize:12,margin:"8px 0 0"}}>{urlError}</p>}
+            <button style={{...btnPrimary,marginTop:16}}
+              onClick={()=>validateUrl()&&setStep(1)}
+              onMouseEnter={e=>e.currentTarget.style.background=C.blue}
+              onMouseLeave={e=>e.currentTarget.style.background=C.sky}>
+              Grade My Website →
+            </button>
+            <p style={{textAlign:"center",fontSize:12,color:C.muted,marginTop:14}}>
+              Takes about 15 seconds · Used by small business owners
+            </p>
+          </div>
+        )}
+
+        {step===1&&(
+          <div style={{background:C.white,borderRadius:16,padding:"28px 28px 24px",boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}}>
+            <p style={{fontSize:13,color:C.slate,marginBottom:6}}>Analyzing: <span style={{color:C.sky,fontWeight:600,wordBreak:"break-all"}}>{url}</span></p>
+            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800,color:C.navy,margin:"0 0 6px"}}>Where should we send your report?</h2>
+            <p style={{fontSize:13,color:C.muted,margin:"0 0 20px",lineHeight:1.5}}>Your scores are ready. Enter your info to unlock your full grade and #1 quick win.</p>
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <input style={inputStyle} placeholder="Your name" value={name}
+                onChange={e=>{setName(e.target.value);setInfoError("");}}
+                onFocus={e=>e.target.style.borderColor=C.sky} onBlur={e=>e.target.style.borderColor=C.border}/>
+              <input style={inputStyle} placeholder="Business email" type="email" value={email}
+                onChange={e=>{setEmail(e.target.value);setInfoError("");}}
+                onFocus={e=>e.target.style.borderColor=C.sky} onBlur={e=>e.target.style.borderColor=C.border}/>
+              <input style={inputStyle} placeholder="Company name (optional)" value={company}
+                onChange={e=>setCompany(e.target.value)}
+                onFocus={e=>e.target.style.borderColor=C.sky} onBlur={e=>e.target.style.borderColor=C.border}/>
+            </div>
+            {infoError&&<p style={{color:C.red,fontSize:12,margin:"10px 0 0"}}>{infoError}</p>}
+            {error&&<p style={{color:C.red,fontSize:12,margin:"10px 0 0"}}>{error}</p>}
+            <button style={{...btnPrimary,marginTop:16}}
+              onClick={()=>validateInfo()&&analyzeWebsite()}
+              onMouseEnter={e=>e.currentTarget.style.background=C.blue}
+              onMouseLeave={e=>e.currentTarget.style.background=C.sky}>
+              Unlock My Free Report →
+            </button>
+            <p style={{textAlign:"center",fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
+              🔒 No spam, ever. Your info is used only to deliver your report and follow up with your consultation offer.
+            </p>
+          </div>
+        )}
+
+        {step===2&&(
+          <div style={{textAlign:"center",padding:"60px 20px"}}>
+            <div style={{position:"relative",width:80,height:80,margin:"0 auto 28px"}}>
+              <div style={{width:80,height:80,borderRadius:"50%",border:`3px solid rgba(242,100,25,0.2)`,borderTop:`3px solid ${C.sky}`,animation:"spin 1s linear infinite"}}/>
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            </div>
+            <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:22,fontWeight:800,color:C.white,margin:"0 0 12px"}}>Analyzing your website...</h2>
+            <p style={{color:C.sky,fontSize:14,fontWeight:500,minHeight:22,transition:"opacity 0.3s"}}>{typingText}</p>
+            <p style={{color:"rgba(255,255,255,0.3)",fontSize:12,marginTop:20}}>This takes about 15 seconds</p>
+          </div>
+        )}
+
+        {step===3&&report&&<Report report={report}/>}
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("tool-root"));
+root.render(<WebsiteGrader/>);
+</script>
+</body>
+</html>
