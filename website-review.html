@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SiteGrade — Free Website Analyzer · Ideplement</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Reset & base ───────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: #111;
+    color: #fff;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Nav ────────────────────────────────────────────────────────── */
+  .site-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 2.5rem;
+    background: rgba(17,17,17,0.93);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .nav-logo {
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.35rem;
+    letter-spacing: -0.03em; color: #fff; text-decoration: none;
+  }
+  .nav-logo span { color: #F26419; }
+  .nav-links { display: flex; align-items: center; gap: 2rem; list-style: none; }
+  .nav-links a {
+    font-size: 0.85rem; font-weight: 500;
+    color: rgba(255,255,255,0.45); text-decoration: none; transition: color 0.2s;
+  }
+  .nav-links a:hover { color: #fff; }
+  .nav-links a.active { color: #F26419; }
+  .nav-cta {
+    background: #F26419 !important; color: #fff !important;
+    padding: 0.5rem 1.15rem; border-radius: 100px;
+  }
+  .nav-cta:hover { background: #C45000 !important; }
+
+  /* ── Tool shell ─────────────────────────────────────────────────── */
+  #app {
+    padding-top: 64px;
+    min-height: calc(100vh - 68px);
+  }
+  .tool-header {
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 1rem 1.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .tool-brand {
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.1rem; color: #fff;
+  }
+  .tool-brand span { color: #F26419; }
+  .tool-sub { font-size: 0.7rem; color: rgba(255,255,255,0.3); margin-left: 0.6rem; letter-spacing: 0.08em; }
+  .tool-by { font-size: 0.75rem; color: rgba(255,255,255,0.35); }
+  .tool-by strong { color: rgba(255,255,255,0.6); }
+
+  .tool-body { max-width: 560px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+
+  /* ── Steps indicator ────────────────────────────────────────────── */
+  .steps {
+    display: flex; align-items: center; justify-content: center;
+    gap: 0; margin-bottom: 2.25rem;
+  }
+  .step-wrap { display: flex; align-items: center; }
+  .step-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .step-circle {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; transition: all 0.3s;
+    background: #E0E0E0; color: #888;
+  }
+  .step-circle.active { background: #F26419; color: #fff; }
+  .step-circle.done { background: #F26419; color: #fff; }
+  .step-label { font-size: 11px; white-space: nowrap; color: #888; font-weight: 400; }
+  .step-label.active { color: #F26419; font-weight: 600; }
+  .step-label.done { color: #F26419; }
+  .step-line { width: 60px; height: 2px; background: #E0E0E0; margin: 0 8px; margin-top: -16px; transition: background 0.3s; }
+  .step-line.done { background: #F26419; }
+
+  /* ── Hero text ──────────────────────────────────────────────────── */
+  .hero-badge {
+    display: inline-block;
+    background: rgba(242,100,25,0.15); border: 1px solid rgba(242,100,25,0.3);
+    border-radius: 20px; padding: 4px 14px;
+    font-size: 12px; color: #F26419; font-weight: 600; letter-spacing: 0.06em;
+    margin-bottom: 1rem;
+  }
+  .hero-title {
+    font-family: 'Syne', sans-serif; font-size: clamp(1.8rem,5vw,2.1rem);
+    font-weight: 800; color: #fff; line-height: 1.15; margin-bottom: 0.9rem;
+  }
+  .hero-title span { color: #F26419; }
+  .hero-desc { font-size: 15px; color: rgba(255,255,255,0.55); line-height: 1.65; margin-bottom: 2.25rem; }
+
+  /* ── Cards ──────────────────────────────────────────────────────── */
+  .card {
+    background: #fff; color: #111; border-radius: 16px;
+    padding: 1.75rem; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    margin-bottom: 0.9rem;
+  }
+  .card-label {
+    font-size: 13px; font-weight: 600; color: #555; margin-bottom: 8px; letter-spacing: 0.04em;
+  }
+
+  /* ── Inputs ─────────────────────────────────────────────────────── */
+  input {
+    width: 100%; padding: 13px 16px; font-size: 15px;
+    border: 1.5px solid #E0E0E0; border-radius: 10px;
+    background: #fff; color: #111; font-family: inherit;
+    outline: none; transition: border-color 0.2s; margin-bottom: 12px;
+  }
+  input:focus { border-color: #F26419; }
+  input::placeholder { color: #aaa; }
+
+  /* ── Buttons ────────────────────────────────────────────────────── */
+  .btn {
+    width: 100%; padding: 15px 24px; font-size: 15px; font-weight: 700;
+    border: none; border-radius: 10px; cursor: pointer; font-family: inherit;
+    transition: background 0.2s, transform 0.1s; letter-spacing: 0.3px;
+  }
+  .btn-primary { background: #F26419; color: #fff; }
+  .btn-primary:hover { background: #C45000; }
+  .btn-green { background: #1A7A4A; color: #fff; }
+  .btn-green:hover { background: #155c38; }
+
+  .btn-note {
+    text-align: center; font-size: 12px; color: #888;
+    margin-top: 0.75rem; line-height: 1.5;
+  }
+
+  /* ── Error ──────────────────────────────────────────────────────── */
+  .field-error { color: #B02020; font-size: 12px; margin: -6px 0 10px; }
+
+  /* ── Analyzing spinner ──────────────────────────────────────────── */
+  .analyzing {
+    text-align: center; padding: 3.75rem 1.25rem;
+  }
+  .spinner {
+    width: 80px; height: 80px; border-radius: 50%;
+    border: 3px solid rgba(242,100,25,0.2);
+    border-top: 3px solid #F26419;
+    margin: 0 auto 1.75rem;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .analyzing h2 {
+    font-family: 'Syne', sans-serif; font-size: 1.375rem; font-weight: 800;
+    color: #fff; margin-bottom: 0.75rem;
+  }
+  .analyzing-msg { color: #F26419; font-size: 14px; font-weight: 500; min-height: 22px; }
+  .analyzing-note { color: rgba(255,255,255,0.3); font-size: 12px; margin-top: 1.25rem; }
+
+  /* ── Report ─────────────────────────────────────────────────────── */
+  @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+  .report { animation: fadeUp 0.5s ease both; }
+
+  .report-card { background:#fff; color:#111; border-radius:16px; padding:1.75rem 1.5rem; margin-bottom:0.9rem; box-shadow:0 20px 60px rgba(0,0,0,0.3); text-align:center; }
+  .report-url-label { font-size:12px; color:#888; letter-spacing:0.07em; font-weight:600; margin-bottom:4px; }
+  .report-url { font-size:14px; color:#C45000; font-weight:700; word-break:break-all; margin-bottom:1rem; }
+
+  /* Gauge SVG */
+  .gauge-wrap { display:flex; justify-content:center; margin-bottom:0.6rem; }
+
+  .verdict-badge {
+    display:inline-block; border-radius:6px; padding:4px 14px; font-size:13px; font-weight:700; margin-bottom:0.6rem;
+  }
+  .report-headline {
+    font-family:'Syne',sans-serif; font-size:1.0625rem; font-weight:800; color:#111; line-height:1.35;
+  }
+
+  /* Score breakdown */
+  .breakdown-card { background:#fff; color:#111; border-radius:14px; padding:1.375rem 1.5rem; margin-bottom:0.9rem; }
+  .breakdown-title { font-size:12px; font-weight:700; color:#888; letter-spacing:0.07em; margin-bottom:1rem; }
+  .score-row { margin-bottom:14px; }
+  .score-row-top { display:flex; justify-content:space-between; margin-bottom:6px; }
+  .score-row-label { font-size:13px; color:#555; font-weight:500; }
+  .score-row-val { font-size:13px; font-weight:700; }
+  .score-row-sub { font-size:11px; font-weight:400; color:#888; }
+  .bar-track { height:7px; border-radius:4px; background:#E0E0E0; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:4px; width:0%; transition:width 1s cubic-bezier(0.22,1,0.36,1); }
+
+  /* Quick win */
+  .quickwin {
+    background:#E8F5EE; border:1.5px solid #1A7A4A; border-radius:14px;
+    padding:1.25rem 1.375rem; margin-bottom:0.9rem;
+    display:flex; align-items:flex-start; gap:12px;
+  }
+  .quickwin-icon {
+    width:34px; height:34px; border-radius:8px; background:#1A7A4A;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px; flex-shrink:0;
+  }
+  .quickwin-label { font-size:12px; font-weight:700; color:#1A7A4A; letter-spacing:0.07em; margin-bottom:4px; }
+  .quickwin-text { font-size:14px; color:#0F4A2A; line-height:1.6; font-weight:500; }
+
+  /* Gated section */
+  .gated { background:#fff; color:#111; border-radius:14px; padding:1.375rem 1.5rem; margin-bottom:0.9rem; position:relative; overflow:hidden; min-height:200px; }
+  .gated-title { font-size:12px; font-weight:700; color:#888; letter-spacing:0.07em; margin-bottom:12px; }
+  .gated-item { display:flex; gap:10px; margin-bottom:10px; }
+  .gated-dot { width:6px; height:6px; border-radius:50%; margin-top:6px; flex-shrink:0; }
+  .gated-item-text { font-size:13px; color:#555; }
+  .gated-overlay {
+    position:absolute; inset:0;
+    background:linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.97) 55%);
+  }
+  .gated-cta {
+    position:absolute; bottom:0; left:0; right:0;
+    padding:1.25rem 1.5rem 1.5rem; text-align:center;
+  }
+  .teaser-box {
+    background:#FEF3E6; border:1px solid #B8640A; border-radius:10px;
+    padding:14px 16px; margin-bottom:14px;
+  }
+  .teaser-title { font-size:13px; color:#B8640A; font-weight:700; margin-bottom:4px; }
+  .teaser-sub { font-size:12px; color:#7A4500; }
+
+  /* CTA block */
+  .cta-block {
+    background:#111; border:1px solid rgba(242,100,25,0.3);
+    border-radius:16px; padding:1.625rem 1.5rem; text-align:center;
+  }
+  .cta-eyebrow { font-size:12px; color:#F26419; font-weight:700; letter-spacing:0.07em; margin-bottom:8px; }
+  .cta-title { font-family:'Syne',sans-serif; font-size:1.25rem; font-weight:800; color:#fff; margin-bottom:10px; line-height:1.3; }
+  .cta-desc { font-size:13px; color:rgba(255,255,255,0.55); margin-bottom:1.25rem; line-height:1.6; }
+
+  .cal-slots { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:1.25rem; margin-bottom:10px; text-align:left; }
+  .cal-slots-title { color:#fff; font-size:14px; font-weight:600; margin-bottom:8px; }
+  .cal-slot {
+    padding:10px 14px; border-radius:8px; border:1px solid rgba(255,255,255,0.15);
+    color:rgba(255,255,255,0.8); font-size:13px; cursor:pointer;
+    margin-bottom:6px; transition:background 0.15s;
+  }
+  .cal-slot:hover { background:rgba(255,255,255,0.08); }
+  .cal-note { color:rgba(255,255,255,0.3); font-size:11px; margin-top:8px; }
+  .cta-email { display:block; font-size:13px; color:rgba(255,255,255,0.4); margin-top:8px; text-decoration:none; }
+  .cta-email:hover { color:rgba(255,255,255,0.7); }
+  .cta-fine { font-size:12px; color:rgba(255,255,255,0.3); margin-top:12px; }
+
+  .social-proof { text-align:center; margin-top:1.25rem; font-size:12px; color:rgba(255,255,255,0.25); line-height:1.6; }
+
+  /* ── Footer ─────────────────────────────────────────────────────── */
+  .site-footer {
+    background:#0a0a0a; border-top:1px solid rgba(255,255,255,0.06);
+    padding:2rem 2.5rem;
+    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;
+  }
+  .footer-links { display:flex; gap:1.75rem; list-style:none; }
+  .footer-links a { font-size:0.8rem; color:rgba(255,255,255,0.3); text-decoration:none; transition:color 0.2s; }
+  .footer-links a:hover { color:rgba(255,255,255,0.7); }
+  .footer-copy { font-size:0.75rem; color:rgba(255,255,255,0.2); }
+
+  @media (max-width:640px) {
+    .site-nav { padding:0.9rem 1.25rem; }
+    .nav-links { display:none; }
+    .site-footer { flex-direction:column; text-align:center; padding:1.5rem 1.25rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="site-nav">
+  <a href="index.html" class="nav-logo">Idep<span>lement</span></a>
+  <ul class="nav-links">
+    <li><a href="index.html#services">Services</a></li>
+    <li><a href="index.html#process">Process</a></li>
+    <li><a href="index.html#portfolio">Portfolio</a></li>
+    <li><a href="website-review.html" class="active">Site Review Tool</a></li>
+    <li><a href="index.html#about">Who We Serve</a></li>
+    <li><a href="index.html#contact" class="nav-cta">Let's Talk</a></li>
+  </ul>
+</nav>
+
+<!-- APP -->
+<div id="app">
+  <div class="tool-header">
+    <div>
+      <span class="tool-brand">Site<span>Grade</span></span>
+      <span class="tool-sub">FREE WEBSITE ANALYZER</span>
+    </div>
+    <span class="tool-by">by <strong>Ideplement</strong></span>
+  </div>
+  <div class="tool-body" id="tool-body">
+    <!-- Injected by JS -->
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+  <a href="index.html" class="nav-logo">Idep<span style="color:#F26419">lement</span></a>
+  <ul class="footer-links">
+    <li><a href="index.html#services">Services</a></li>
+    <li><a href="index.html#process">Process</a></li>
+    <li><a href="index.html#portfolio">Portfolio</a></li>
+    <li><a href="website-review.html">Site Review Tool</a></li>
+    <li><a href="index.html#contact">Contact</a></li>
+  </ul>
+  <p class="footer-copy">© 2026 Ideplement. All rights reserved.</p>
+</footer>
+
+<script>
+// ── CONFIG — your Cloudflare Worker URL (no trailing slash) ──────────
+const WORKER_URL = "https://ideplement-proxy.dhcalicker.workers.dev";
+
+// ── Color helpers ────────────────────────────────────────────────────
+function scoreColor(s) {
+  if (s >= 7) return { fg: "#1A7A4A", bg: "#E8F5EE" };
+  if (s >= 4) return { fg: "#B8640A", bg: "#FEF3E6" };
+  return { fg: "#B02020", bg: "#FDECEC" };
+}
+function scoreLabel(s) {
+  if (s >= 8) return "Strong";
+  if (s >= 6) return "Decent";
+  if (s >= 4) return "Weak";
+  return "Critical";
+}
+
+// ── State ────────────────────────────────────────────────────────────
+let state = { step: 0, url: "", name: "", email: "", company: "", report: null };
+
+// ── Render engine ────────────────────────────────────────────────────
+function render() {
+  const body = document.getElementById("tool-body");
+  body.innerHTML = buildScreen();
+  attachEvents();
+  if (state.step === 3 && state.report) animateBars();
+}
+
+// ── Steps HTML ───────────────────────────────────────────────────────
+function buildSteps() {
+  const labels = ["Enter URL", "Your Info", "Your Report"];
+  let html = '<div class="steps">';
+  labels.forEach((label, i) => {
+    const done = i < state.step;
+    const active = i === state.step;
+    html += `<div class="step-wrap">
+      <div class="step-item">
+        <div class="step-circle ${done ? "done" : active ? "active" : ""}">${done ? "✓" : i + 1}</div>
+        <span class="step-label ${done ? "done" : active ? "active" : ""}">${label}</span>
+      </div>`;
+    if (i < labels.length - 1) {
+      html += `<div class="step-line ${done ? "done" : ""}"></div>`;
+    }
+    html += "</div>";
+  });
+  html += "</div>";
+  return html;
+}
+
+// ── Hero text ────────────────────────────────────────────────────────
+function buildHero() {
+  return `
+    <div style="text-align:center;margin-bottom:2.25rem;">
+      <div class="hero-badge">FREE · INSTANT · NO CREDIT CARD</div>
+      <h1 class="hero-title">Is your website<br><span>losing you leads?</span></h1>
+      <p class="hero-desc">Get an instant AI-powered grade across 5 key areas — lead capture, trust signals, SEO, CTAs, and content. See exactly where you're leaving money on the table.</p>
+    </div>`;
+}
+
+// ── Screen builder ───────────────────────────────────────────────────
+function buildScreen() {
+  switch (state.step) {
+    case 0: return buildHero() + buildSteps() + buildStep0();
+    case 1: return buildHero() + buildSteps() + buildStep1();
+    case 2: return buildAnalyzing();
+    case 3: return buildReport();
+    default: return "";
+  }
+}
+
+// ── Step 0: URL ──────────────────────────────────────────────────────
+function buildStep0() {
+  return `
+    <div class="card">
+      <div class="card-label">YOUR WEBSITE URL</div>
+      <input id="urlInput" type="url" placeholder="https://yourbusiness.com" value="${escHtml(state.url)}" />
+      <div class="field-error" id="urlError"></div>
+      <button class="btn btn-primary" id="urlBtn">Grade My Website →</button>
+      <p class="btn-note">Takes about 15 seconds · Used by small business owners</p>
+    </div>`;
+}
+
+// ── Step 1: Info ─────────────────────────────────────────────────────
+function buildStep1() {
+  return `
+    <div class="card">
+      <p style="font-size:13px;color:#555;margin-bottom:6px;">Analyzing: <span style="color:#C45000;font-weight:600;word-break:break-all;">${escHtml(state.url)}</span></p>
+      <h2 style="font-family:'Syne',sans-serif;font-size:1.25rem;font-weight:800;color:#111;margin-bottom:6px;">Where should we send your report?</h2>
+      <p style="font-size:13px;color:#888;margin-bottom:1.25rem;line-height:1.5;">Your scores are ready. Enter your info to unlock your full grade and #1 quick win.</p>
+      <input id="nameInput" type="text" placeholder="Your name" value="${escHtml(state.name)}" />
+      <input id="emailInput" type="email" placeholder="Business email" value="${escHtml(state.email)}" />
+      <input id="companyInput" type="text" placeholder="Company name (optional)" value="${escHtml(state.company)}" />
+      <div class="field-error" id="infoError"></div>
+      <button class="btn btn-primary" id="infoBtn">Unlock My Free Report →</button>
+      <p class="btn-note">🔒 No spam, ever. Used only to deliver your report and follow up.</p>
+    </div>`;
+}
+
+// ── Analyzing screen ─────────────────────────────────────────────────
+const analyzeMessages = [
+  "Fetching your website...", "Analyzing lead capture elements...",
+  "Evaluating trust signals...", "Checking SEO fundamentals...",
+  "Reviewing CTA effectiveness...", "Assessing content depth...",
+  "Calculating your scores...", "Preparing your report...",
+];
+let msgIndex = 0, msgInterval = null;
+
+function buildAnalyzing() {
+  return `
+    <div class="analyzing">
+      <div class="spinner"></div>
+      <h2>Analyzing your website...</h2>
+      <p class="analyzing-msg" id="analyzeMsg">${analyzeMessages[0]}</p>
+      <p class="analyzing-note">This takes about 15 seconds</p>
+    </div>`;
+}
+
+function startMsgCycle() {
+  msgIndex = 0;
+  if (msgInterval) clearInterval(msgInterval);
+  msgInterval = setInterval(() => {
+    msgIndex = (msgIndex + 1) % analyzeMessages.length;
+    const el = document.getElementById("analyzeMsg");
+    if (el) el.textContent = analyzeMessages[msgIndex];
+  }, 2000);
+}
+
+// ── Report ───────────────────────────────────────────────────────────
+function buildReport() {
+  const r = state.report;
+  const { fg, bg } = scoreColor(r.overallScore);
+  const verdict = r.overallScore < 4 ? "Needs Urgent Attention"
+    : r.overallScore < 7 ? "Room for Improvement" : "Performing Well";
+  const oppCount = Math.floor(Math.random() * 4) + 8;
+  const firstName = r.name ? r.name.split(" ")[0] : null;
+
+  const categories = [
+    { key: "leadCapture",  label: "Lead capture" },
+    { key: "trustSignals", label: "Trust signals" },
+    { key: "seoReadiness", label: "SEO readiness" },
+    { key: "ctaClarity",   label: "CTA clarity" },
+    { key: "contentDepth", label: "Content depth" },
+  ];
+
+  const barsHtml = categories.map((c, i) => {
+    const sc = r.scores[c.key];
+    const { fg: bfg } = scoreColor(sc);
+    return `
+      <div class="score-row">
+        <div class="score-row-top">
+          <span class="score-row-label">${c.label}</span>
+          <span class="score-row-val" style="color:${bfg}">${sc}/10 <span class="score-row-sub">${scoreLabel(sc)}</span></span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" id="bar-${i}" style="background:${bfg}"></div>
+        </div>
+      </div>`;
+  }).join("");
+
+  const gaugeHtml = buildGauge(r.overallScore, fg);
+
+  return `
+  <div class="report">
+    <div class="report-card">
+      <div class="report-url-label">WEBSITE GRADE FOR</div>
+      <div class="report-url">${escHtml(r.url)}</div>
+      <div class="gauge-wrap">${gaugeHtml}</div>
+      <span class="verdict-badge" style="background:${bg};color:${fg}">${verdict}</span>
+      <p class="report-headline">"${escHtml(r.headline)}"</p>
+    </div>
+
+    <div class="breakdown-card">
+      <div class="breakdown-title">SCORE BREAKDOWN</div>
+      ${barsHtml}
+    </div>
+
+    <div class="quickwin">
+      <div class="quickwin-icon">💡</div>
+      <div>
+        <div class="quickwin-label">YOUR #1 QUICK WIN</div>
+        <div class="quickwin-text">${escHtml(r.topOpportunity)}</div>
+      </div>
+    </div>
+
+    <div class="gated">
+      <div class="gated-title">FULL ANALYSIS — 18 ADDITIONAL FINDINGS</div>
+      ${["Critical: No click-to-call phone number visible above the fold on mobile",
+         "High: Missing testimonials and social proof on homepage and service pages",
+         "High: No city-specific SEO landing pages for your service area",
+         "Medium: Page load speed issues detected — impacting rankings",
+         "Medium: No FAQ page — missing high-intent search traffic"]
+        .map((item, i) => `
+        <div class="gated-item" style="filter:${i >= 1 ? "blur(4px)" : "blur(2px)"};user-select:none;">
+          <div class="gated-dot" style="background:${i === 0 ? "#B02020" : "#B8640A"}"></div>
+          <span class="gated-item-text">${item}</span>
+        </div>`).join("")}
+      <div class="gated-overlay"></div>
+      <div class="gated-cta">
+        <div class="teaser-box">
+          <div class="teaser-title">🔒 ${escHtml(r.teaser)}</div>
+          <div class="teaser-sub">Unlock the full report in a free 20-minute consultation.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cta-block">
+      <div class="cta-eyebrow">FREE 20-MINUTE CONSULTATION</div>
+      <h3 class="cta-title">See the full report &amp; get a custom game plan</h3>
+      <p class="cta-desc">${firstName ? firstName + ", we" : "We"} found ${oppCount} specific opportunities on your site. In 20 minutes we'll walk through every one, show you exactly what to fix first, and give you a no-obligation roadmap.</p>
+      <button class="btn btn-green" id="calBtn">Book My Free Consultation →</button>
+      <div id="calSlots" style="display:none;">
+        <div class="cal-slots">
+          <div class="cal-slots-title">Choose a time that works for you:</div>
+          ${["Tomorrow, 10:00 AM","Tomorrow, 2:00 PM","Thu, 9:00 AM","Thu, 3:00 PM","Fri, 11:00 AM"]
+            .map(t => `<div class="cal-slot" onclick="bookSlot('${t}')">📅 ${t}</div>`).join("")}
+          <p class="cal-note">All times in EST · Selecting a time opens your email to confirm</p>
+        </div>
+      </div>
+      <a href="mailto:dhcalicker@gmail.com?subject=Free Consultation — Website Review" class="cta-email">Or email directly: dhcalicker@gmail.com</a>
+      <p class="cta-fine">No obligation · No sales pressure · Genuinely useful regardless</p>
+    </div>
+
+    <div class="social-proof">★★★★★ Trusted by small business owners · Free tool by <strong style="color:rgba(255,255,255,0.4)">Ideplement</strong></div>
+  </div>`;
+}
+
+// ── SVG Gauge (static at correct score — animated via CSS) ───────────
+function buildGauge(score, fg) {
+  const r = 40, cx = 55, cy = 55;
+  const circ = 2 * Math.PI * r;
+  const arc = (score / 10) * circ * 0.75;
+  return `<svg width="130" height="130" viewBox="0 0 110 110">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#E0E0E0" stroke-width="8"
+      stroke-dasharray="${circ*0.75} ${circ}" stroke-dashoffset="${circ*0.125}"
+      stroke-linecap="round" transform="rotate(135 ${cx} ${cy})"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${fg}" stroke-width="8"
+      stroke-dasharray="${arc} ${circ}" stroke-dashoffset="${circ*0.125}"
+      stroke-linecap="round" transform="rotate(135 ${cx} ${cy})"/>
+    <text x="${cx}" y="${cy-4}" text-anchor="middle" dominant-baseline="middle"
+      style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;fill:${fg}">${score}</text>
+    <text x="${cx}" y="${cy+16}" text-anchor="middle"
+      style="font-size:10px;fill:#888">/10</text>
+  </svg>`;
+}
+
+// ── Animate score bars after report renders ──────────────────────────
+function animateBars() {
+  const cats = ["leadCapture","trustSignals","seoReadiness","ctaClarity","contentDepth"];
+  cats.forEach((key, i) => {
+    const bar = document.getElementById("bar-" + i);
+    if (bar) setTimeout(() => { bar.style.width = (state.report.scores[key] * 10) + "%"; }, 200 + i * 120);
+  });
+}
+
+// ── Event wiring ─────────────────────────────────────────────────────
+function attachEvents() {
+  const urlBtn = document.getElementById("urlBtn");
+  if (urlBtn) urlBtn.addEventListener("click", handleUrlNext);
+
+  const urlInput = document.getElementById("urlInput");
+  if (urlInput) urlInput.addEventListener("keydown", e => { if (e.key === "Enter") handleUrlNext(); });
+
+  const infoBtn = document.getElementById("infoBtn");
+  if (infoBtn) infoBtn.addEventListener("click", handleInfoNext);
+
+  const calBtn = document.getElementById("calBtn");
+  if (calBtn) calBtn.addEventListener("click", toggleCal);
+}
+
+function toggleCal() {
+  const slots = document.getElementById("calSlots");
+  const btn   = document.getElementById("calBtn");
+  if (!slots || !btn) return;
+  const showing = slots.style.display !== "none";
+  slots.style.display = showing ? "none" : "block";
+  btn.textContent = showing ? "Book My Free Consultation →" : "Hide Calendar ↑";
+}
+
+function bookSlot(time) {
+  window.location.href = `mailto:dhcalicker@gmail.com?subject=Free Consultation Request — Website Review&body=Hi, I just received my website grade and would like to book a free 20-minute consultation. Preferred time: ${time}.`;
+}
+
+// ── Validation & flow ────────────────────────────────────────────────
+function handleUrlNext() {
+  const input = document.getElementById("urlInput");
+  const errEl = document.getElementById("urlError");
+  const val = (input ? input.value : "").trim();
+  if (!val) { if (errEl) errEl.textContent = "Please enter a website URL."; return; }
+  try {
+    const u = new URL(val.startsWith("http") ? val : "https://" + val);
+    if (!u.hostname.includes(".")) throw new Error();
+    state.url = u.href;
+    state.step = 1;
+    render();
+  } catch {
+    if (errEl) errEl.textContent = "Please enter a valid URL, e.g. yoursite.com";
+  }
+}
+
+function handleInfoNext() {
+  const name    = document.getElementById("nameInput");
+  const email   = document.getElementById("emailInput");
+  const company = document.getElementById("companyInput");
+  const errEl   = document.getElementById("infoError");
+
+  const n = name ? name.value.trim() : "";
+  const e = email ? email.value.trim() : "";
+  const c = company ? company.value.trim() : "";
+
+  if (!n || !e) { if (errEl) errEl.textContent = "Please enter your name and email."; return; }
+  if (!/\S+@\S+\.\S+/.test(e)) { if (errEl) errEl.textContent = "Please enter a valid email address."; return; }
+
+  state.name = n; state.email = e; state.company = c;
+  state.step = 2;
+  render();
+  startMsgCycle();
+  analyzeWebsite();
+}
+
+// ── API call ─────────────────────────────────────────────────────────
+async function analyzeWebsite() {
+  const prompt = `You are a website conversion and lead generation expert. Analyze the website at this URL: ${state.url}
+
+Based on what you can determine about this website (from the URL, domain name, any publicly available information, and general knowledge about this type of business), grade it on these 5 dimensions on a scale of 1-10:
+
+1. Lead Capture - forms, CTAs, phone numbers, lead magnets
+2. Trust Signals - testimonials, reviews, certifications, team info, social proof
+3. SEO Readiness - local SEO, page titles, content structure, city/service pages
+4. CTA Clarity - clear calls to action, button placement, urgency, next steps
+5. Content Depth - quality of copy, service descriptions, FAQs, blog/resources
+
+Respond ONLY with valid JSON in exactly this format, no other text:
+{
+  "businessName": "short business name from URL or domain",
+  "businessType": "type of business in 3-5 words",
+  "overallScore": <number 1-10>,
+  "scores": {
+    "leadCapture": <number 1-10>,
+    "trustSignals": <number 1-10>,
+    "seoReadiness": <number 1-10>,
+    "ctaClarity": <number 1-10>,
+    "contentDepth": <number 1-10>
+  },
+  "topOpportunity": "One specific, concrete, actionable improvement they can make RIGHT NOW — written as a single sentence starting with an action verb. Specific to this business type. Max 30 words.",
+  "teaser": "A single sentence hinting at 2-3 other critical issues without revealing them. Create urgency. Max 35 words.",
+  "headline": "A punchy 6-8 word summary verdict. Example: 'Strong brand, but leads are slipping through.' Specific to this business."
+}`;
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    if (!res.ok) {
+      throw new Error("Worker returned " + res.status);
+    }
+
+    const data = await res.json();
+    const text = (data.content || []).find(b => b.type === "text")?.text || "";
+    const clean = text.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(clean);
+
+    if (msgInterval) clearInterval(msgInterval);
+    state.report = { ...parsed, url: state.url, name: state.name, email: state.email };
+    state.step = 3;
+    render();
+
+  } catch (err) {
+    console.error("Analysis error:", err);
+    if (msgInterval) clearInterval(msgInterval);
+    state.step = 1;
+    render();
+    const errEl = document.getElementById("infoError");
+    if (errEl) errEl.textContent = "We couldn't reach the analysis server. Please try again in a moment.";
+  }
+}
+
+// ── Utility ──────────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ── Boot ─────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
