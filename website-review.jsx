@@ -3,8 +3,8 @@ import { useState, useEffect, useRef } from "react";
 // ─────────────────────────────────────────────────────────────────
 // ██  TESTING PHASE CONFIG — fill in these two lines only  ██
 // ─────────────────────────────────────────────────────────────────
-const RESEND_API_KEY = "re_PASTE_YOUR_RESEND_KEY_HERE";
-const YOUR_EMAIL     = "you@youremail.com";
+const RESEND_API_KEY = "re_Qn3o4ZMH_HwXwqT4Za73vBaDB3rEpgykV";
+const YOUR_EMAIL     = "Dhcalicker@gmail.com";
 // ─────────────────────────────────────────────────────────────────
 // Get your free Resend key at: resend.com/api-keys (takes 2 min)
 // NOTE: For testing only — move to backend before public launch
