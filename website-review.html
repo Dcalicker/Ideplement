@@ -342,7 +342,7 @@ try {
         const ts=new Date().toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true});
         Promise.all([
           sendEmail({to:YOUR_EMAIL,subject:`New lead: ${name} — ${parsed.businessType} — ${parsed.overallScore}/10`,html:buildOwnerEmail({name,email,company,url,report:parsed,timestamp:ts}),replyTo:email}),
-          sendEmail({to:email,subject:`${name.split(" ")[0]}, your free website grade is ready`,html:buildProspectEmail({name,url,report:parsed}),replyTo:YOUR_EMAIL}),
+          sendEmail({to:YOUR_EMAIL,subject:`${name.split(" ")[0]}, your free website grade is ready`,html:buildProspectEmail({name,url,report:parsed}),replyTo:YOUR_EMAIL}),
         ]).catch(e=>console.warn("Email issue:",e));
 
         setReport({...parsed,url,name,email,company});
