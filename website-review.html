@@ -315,12 +315,18 @@ Respond ONLY with valid JSON, no other text:
 {"businessName":"short name","businessType":"type in 4 words","overallScore":<1-10>,"scores":{"leadCapture":<1-10>,"trustSignals":<1-10>,"seoReadiness":<1-10>,"ctaClarity":<1-10>,"contentDepth":<1-10>},"topOpportunity":"One specific actionable improvement, verb first, max 28 words.","teaser":"Start with: We also identified... hint at 2-3 issues, max 32 words.","headline":"6-8 word punchy verdict.","fullReport":{"leadCaptureDetail":"2-3 sentences.","trustSignalsDetail":"2-3 sentences.","seoDetail":"2-3 sentences.","ctaDetail":"2-3 sentences.","contentDetail":"2-3 sentences.","priorityActions":["Action 1","Action 2","Action 3","Action 4","Action 5"],"competitiveNote":"1-2 sentences.","consultationAngle":"1-2 sentences."}}`;
 
         let parsed;
-        try{
-          const r=await fetch("https://sitegrader-api.dhcalicker.workers.dev",{method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({ url, name, company }),max_tokens:1500,messages:[{role:"user",content:prompt}]});
-          const d=await r.json();
-          parsed=JSON.parse((d.content?.find(b=>b.type==="text")?.text||"").replace(/```json|```/g,"").trim());
-        }catch(e){setInfoError("Analysis failed — check the URL and try again.");setStep(1);return;}
+        try {
+  const r = await fetch("https://sitegrader-api.dhcalicker.workers.dev", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url, name, company }),
+  });
+  parsed = await r.json();
+} catch(e) {
+  setInfoError("Analysis failed — check the URL and try again.");
+  setStep(1);
+  return;
+}
 
         const ts=new Date().toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true});
         Promise.all([
