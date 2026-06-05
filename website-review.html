@@ -319,14 +319,14 @@ try {
   const r = await fetch("https://sitegrader-api.dhcalicker.workers.dev", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, name, company }),
+    body: JSON.stringify({ url, name, email, company }),
   });
 
   parsed = await r.json();
 
   // If the Worker returned an error object, surface it clearly
   if (parsed.error) {
-    console.error("Worker returned error:", parsed.error, parsed.detail || "");
+    console.error("Worker error:", parsed.error);
     setInfoError("Analysis failed — " + parsed.error);
     setStep(1);
     return;
