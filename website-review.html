@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Free Website Grader — Powered by Ideplement</title>
+  <meta name="description" content="Get an instant AI-powered grade for your website. Free tool by Ideplement." />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #111111; font-family: 'DM Sans', system-ui, sans-serif; }
+    @keyframes spin   { to { transform: rotate(360deg); } }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+
+    // ── ONLY config needed in this file ──────────────────────────
+    // Everything else (AI call, email sending) happens in the Worker
+    const WORKER_URL = "https://sitegrader-api.dhcalicker.workers.dev";
+
+    // ── Design tokens ─────────────────────────────────────────────
+    const C = {
+      navy:"#111111", blue:"#C45000", sky:"#F26419",
+      slate:"#555555", muted:"#888888", border:"#E0E0E0", white:"#FFFFFF",
+      green:"#1A7A4A", greenL:"#E8F5EE", amber:"#B8640A", amberL:"#FEF3E6",
+      red:"#B02020", redL:"#FDECEC",
+    };
+
+    function scoreColor(s) {
+      if (s >= 7) return { fg: C.green, bg: C.greenL };
+      if (s >= 4) return { fg: C.amber, bg: C.amberL };
+      return { fg: C.red, bg: C.redL };
+    }
+    function scoreLabel(s) {
+      if (s >= 8) return "Strong"; if (s >= 6) return "Decent";
+      if (s >= 4) return "Weak";   return "Critical";
+    }
+
+    // ── Gauge ─────────────────────────────────────────────────────
+    function Gauge({ score, size=110 }) {
+      const [anim, setAnim] = React.useState(0);
+      React.useEffect(() => {
+        let start = null;
+        const step = ts => {
+          if (!start) start = ts;
+          const p = Math.min((ts - start) / 1400, 1);
+          setAnim((1 - Math.pow(1 - p, 3)) * score);
+          if (p < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }, [score]);
+      const r=40, cx=55, cy=55, circ=2*Math.PI*r, arc=(anim/10)*circ*0.75;
+      const { fg } = scoreColor(score);
+      return (
+        <svg width={size} height={size} viewBox="0 0 110 110">
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke={C.border} strokeWidth="8"
+            strokeDasharray={`${circ*0.75} ${circ}`} strokeDashoffset={circ*0.125}
+            strokeLinecap="round" transform={`rotate(135 ${cx} ${cy})`} />
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke={fg} strokeWidth="8"
+            strokeDasharray={`${arc} ${circ}`} strokeDashoffset={circ*0.125}
+            strokeLinecap="round" transform={`rotate(135 ${cx} ${cy})`}
+            style={{transition:"stroke-dasharray 0.05s"}} />
+          <text x={cx} y={cy-4} textAnchor="middle" dominantBaseline="middle"
+            style={{fontFamily:"'Syne',sans-serif",fontSize:26,fontWeight:800,fill:fg}}>
+            {Math.round(anim)}
+          </text>
+          <text x={cx} y={cy+16} textAnchor="middle"
+            style={{fontFamily:"system-ui",fontSize:10,fill:C.muted}}>/10</text>
+        </svg>
+      );
+    }
+
+    // ── ScoreBar ──────────────────────────────────────────────────
+    function ScoreBar({ label, score, delay=0 }) {
+      const [w, setW] = React.useState(0);
+      const { fg } = scoreColor(score);
+      React.useEffect(() => {
+        const t = setTimeout(() => setW(score * 10), delay + 200);
+        return () => clearTimeout(t);
+      }, [score]);
+      return (
+        <div style={{marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+            <span style={{fontSize:13,color:C.slate,fontWeight:500}}>{label}</span>
+            <span style={{fontSize:13,fontWeight:700,color:fg}}>
+              {score}/10 <span style={{fontWeight:400,fontSize:11,color:C.muted}}>{scoreLabel(score)}</span>
+            </span>
+          </div>
+          <div style={{height:7,borderRadius:4,background:C.border,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${w}%`,background:fg,borderRadius:4,transition:"width 1s cubic-bezier(0.22,1,0.36,1)"}} />
+          </div>
+        </div>
+      );
+    }
+
+    // ── Steps ─────────────────────────────────────────────────────
+    function Steps({ current }) {
+      const steps = ["Enter URL", "Your Info", "Your Report"];
+      return (
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",marginBottom:36}}>
+          {steps.map((s, i) => (
+            <React.Fragment key={i}>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                <div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",
+                  justifyContent:"center",background:i<=current?C.sky:C.border,
+                  color:i<=current?C.white:C.muted,fontSize:12,fontWeight:700,transition:"all 0.3s"}}>
+                  {i < current ? "✓" : i + 1}
+                </div>
+                <span style={{fontSize:11,color:i<=current?C.sky:C.muted,whiteSpace:"nowrap",
+                  fontWeight:i===current?600:400}}>{s}</span>
+              </div>
+              {i < steps.length - 1 && (
+                <div style={{width:60,height:2,background:i<current?C.sky:C.border,
+                  margin:"0 8px",marginTop:-16,transition:"background 0.3s"}} />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      );
+    }
+
+    // ── Report ────────────────────────────────────────────────────
+    function Report({ report }) {
+      const { overallScore, scores, topOpportunity, teaser, name, email, url } = report;
+      const overall = scoreColor(overallScore);
+      const [showCal, setShowCal] = React.useState(false);
+      const cats = [
+        {key:"leadCapture",  label:"Lead capture"},
+        {key:"trustSignals", label:"Trust signals"},
+        {key:"seoReadiness", label:"SEO readiness"},
+        {key:"ctaClarity",   label:"CTA clarity"},
+        {key:"contentDepth", label:"Content depth"},
+      ];
+      const card = {background:"#fff",borderRadius:14,padding:"22px 24px",marginBottom:14};
+
+      return (
+        <div style={{animation:"fadeUp 0.5s ease both"}}>
+          <style>{`.book-btn:hover{background:#155c38!important;}`}</style>
+
+          {/* Email confirmation banner */}
+          <div style={{background:C.greenL,border:`1px solid ${C.green}`,borderRadius:10,
+            padding:"11px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:16}}>✉️</span>
+            <p style={{fontSize:13,color:"#0F4A2A",margin:0,fontWeight:500}}>
+              Your report has been emailed to <strong>{email}</strong>
+            </p>
+          </div>
+
+          {/* Overall score */}
+          <div style={{...card,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.18)"}}>
+            <p style={{fontSize:12,color:C.muted,letterSpacing:"0.07em",fontWeight:600,marginBottom:4}}>
+              WEBSITE GRADE FOR
+            </p>
+            <p style={{fontSize:13,color:C.sky,fontWeight:700,marginBottom:16,wordBreak:"break-all"}}>{url}</p>
+            <Gauge score={overallScore} size={130} />
+            <div style={{marginTop:10,marginBottom:8}}>
+              <span style={{display:"inline-block",background:overall.bg,color:overall.fg,
+                borderRadius:6,padding:"4px 14px",fontSize:13,fontWeight:700}}>
+                {overallScore < 4 ? "Needs Urgent Attention" : overallScore < 7 ? "Room for Improvement" : "Performing Well"}
+              </span>
+            </div>
+            <p style={{fontFamily:"'Syne',sans-serif",fontSize:17,fontWeight:800,color:C.navy,
+              margin:"10px 0 0",lineHeight:1.35}}>"{report.headline}"</p>
+          </div>
+
+          {/* Score breakdown */}
+          <div style={card}>
+            <p style={{fontSize:12,fontWeight:700,color:C.muted,letterSpacing:"0.07em",marginBottom:16}}>
+              SCORE BREAKDOWN
+            </p>
+            {cats.map((c, i) => (
+              <ScoreBar key={c.key} label={c.label} score={scores[c.key]} delay={i * 120} />
+            ))}
+          </div>
+
+          {/* Quick win */}
+          <div style={{background:C.greenL,border:`1.5px solid ${C.green}`,borderRadius:14,
+            padding:"20px 22px",marginBottom:14}}>
+            <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+              <div style={{width:34,height:34,borderRadius:8,background:C.green,display:"flex",
+                alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:16}}>💡</div>
+              <div>
+                <p style={{fontSize:12,fontWeight:700,color:C.green,letterSpacing:"0.07em",marginBottom:4}}>
+                  YOUR #1 QUICK WIN
+                </p>
+                <p style={{fontSize:14,color:"#0F4A2A",lineHeight:1.6,margin:0,fontWeight:500}}>
+                  {topOpportunity}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Locked gate */}
+          <div style={{background:C.white,borderRadius:14,padding:"22px 24px",marginBottom:14,
+            position:"relative",overflow:"hidden",minHeight:180}}>
+            <div style={{position:"absolute",inset:0,
+              background:"linear-gradient(to bottom,transparent 0%,rgba(255,255,255,0.97) 55%)",zIndex:1}} />
+            <p style={{fontSize:12,fontWeight:700,color:C.muted,letterSpacing:"0.07em",marginBottom:12}}>
+              FULL ANALYSIS — 18 ADDITIONAL FINDINGS
+            </p>
+            {["Critical: No click-to-call phone number visible above the fold",
+              "High: Missing testimonials and social proof on key pages",
+              "High: No city-specific SEO landing pages for your area",
+              "Medium: Page load speed issues — impacting rankings",
+              "Medium: No FAQ page — missing high-intent traffic"]
+              .map((item, i) => (
+                <div key={i} style={{display:"flex",gap:10,marginBottom:10,
+                  filter:`blur(${i===0?2:4}px)`,userSelect:"none"}}>
+                  <div style={{width:6,height:6,borderRadius:"50%",
+                    background:i===0?C.red:C.amber,marginTop:6,flexShrink:0}} />
+                  <span style={{fontSize:13,color:C.slate}}>{item}</span>
+                </div>
+              ))}
+            <div style={{position:"absolute",bottom:0,left:0,right:0,zIndex:2,
+              padding:"16px 22px 20px",textAlign:"center"}}>
+              <div style={{background:C.amberL,border:`1px solid ${C.amber}`,
+                borderRadius:10,padding:"13px 16px"}}>
+                <p style={{fontSize:13,color:C.amber,fontWeight:700,margin:"0 0 3px"}}>
+                  🔒 {teaser}
+                </p>
+                <p style={{fontSize:12,color:"#7A4500",margin:0}}>
+                  Unlock the full report in a free 20-minute consultation.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* CTA */}
+          <div style={{background:C.navy,border:"1px solid rgba(242,100,25,0.3)",
+            borderRadius:16,padding:"26px 24px",textAlign:"center"}}>
+            <p style={{fontSize:12,color:C.sky,fontWeight:700,letterSpacing:"0.07em",marginBottom:8}}>
+              FREE 20-MINUTE CONSULTATION
+            </p>
+            <h3 style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800,color:C.white,
+              margin:"0 0 10px",lineHeight:1.3}}>
+              See the full report &amp; get your custom game plan
+            </h3>
+            <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",margin:"0 0 20px",lineHeight:1.6}}>
+              {name ? `${name.split(" ")[0]}, we` : "We"} found specific opportunities on your site.
+              In 20 minutes we'll walk through every one and give you a clear, no-obligation action plan.
+            </p>
+            <button className="book-btn"
+              style={{width:"100%",padding:"15px 24px",fontSize:15,fontWeight:700,
+                background:C.green,color:C.white,border:"none",borderRadius:10,
+                cursor:"pointer",fontFamily:"inherit",marginBottom:10,transition:"background 0.2s"}}
+              onClick={() => setShowCal(s => !s)}>
+              Book My Free Consultation →
+            </button>
+            {showCal && (
+              <div style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",
+                borderRadius:10,padding:"20px",marginBottom:10,textAlign:"left"}}>
+                <p style={{color:C.white,fontSize:14,fontWeight:600,marginBottom:8}}>Choose a time:</p>
+                {["Tomorrow 10:00 AM","Tomorrow 2:00 PM","Thu 9:00 AM","Thu 3:00 PM","Fri 11:00 AM"]
+                  .map(t => (
+                    <div key={t}
+                      onClick={() => alert(`Selected: ${t}. Connect your Calendly link here.`)}
+                      style={{padding:"10px 14px",borderRadius:8,
+                        border:"1px solid rgba(255,255,255,0.15)",
+                        color:"rgba(255,255,255,0.8)",fontSize:13,cursor:"pointer",marginBottom:6}}
+                      onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.08)"}
+                      onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+                      📅 {t}
+                    </div>
+                  ))}
+              </div>
+            )}
+            <p style={{fontSize:12,color:"rgba(255,255,255,0.3)",margin:0}}>
+              No obligation · No sales pressure · Genuinely useful regardless
+            </p>
+          </div>
+
+          <div style={{textAlign:"center",marginTop:20}}>
+            <p style={{fontSize:12,color:"rgba(255,255,255,0.25)",lineHeight:1.6}}>
+              ★★★★★ Trusted by 500+ business owners · Powered by Ideplement
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Main App ──────────────────────────────────────────────────
+    function App() {
+      const [step,     setStep]     = React.useState(0);
+      const [url,      setUrl]      = React.useState("");
+      const [name,     setName]     = React.useState("");
+      const [email,    setEmail]    = React.useState("");
+      const [company,  setCompany]  = React.useState("");
+      const [report,   setReport]   = React.useState(null);
+      const [urlError, setUrlError] = React.useState("");
+      const [infoError,setInfoError]= React.useState("");
+      const [typing,   setTyping]   = React.useState("Fetching your website...");
+      const msgRef = React.useRef(0);
+
+      const msgs = [
+        "Fetching your website...",
+        "Analyzing lead capture elements...",
+        "Evaluating trust signals...",
+        "Checking SEO fundamentals...",
+        "Reviewing CTA effectiveness...",
+        "Assessing content depth...",
+        "Calculating your scores...",
+        "Preparing your report...",
+      ];
+
+      React.useEffect(() => {
+        if (step !== 2) return;
+        const iv = setInterval(() => {
+          msgRef.current = (msgRef.current + 1) % msgs.length;
+          setTyping(msgs[msgRef.current]);
+        }, 2000);
+        return () => clearInterval(iv);
+      }, [step]);
+
+      function validateUrl() {
+        const v = url.trim();
+        if (!v) { setUrlError("Please enter a website URL."); return false; }
+        try {
+          const u = new URL(v.startsWith("http") ? v : "https://" + v);
+          setUrl(u.href); setUrlError(""); return true;
+        } catch {
+          setUrlError("Please enter a valid URL, e.g. yoursite.com"); return false;
+        }
+      }
+
+      function validateInfo() {
+        if (!name.trim() || !email.trim()) {
+          setInfoError("Please enter your name and email."); return false;
+        }
+        if (!/\S+@\S+\.\S+/.test(email)) {
+          setInfoError("Please enter a valid email address."); return false;
+        }
+        setInfoError(""); return true;
+      }
+
+      // ── THE ONLY FETCH IN THIS FILE — calls the Worker only ──────
+      // The Worker handles Anthropic AND Resend. This file does nothing else.
+      async function analyze() {
+        setStep(2);
+        try {
+          const r = await fetch(WORKER_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url, name, email, company }),
+          });
+
+          const parsed = await r.json();
+
+          if (parsed.error) {
+            console.error("Worker error:", parsed.error, parsed.detail || "");
+            setInfoError("Analysis failed — " + parsed.error);
+            setStep(1);
+            return;
+          }
+
+          setReport({ ...parsed, url, name, email, company });
+          setStep(3);
+
+        } catch (e) {
+          console.error("Fetch failed:", e.message);
+          setInfoError("Could not reach the analysis server. Please try again.");
+          setStep(1);
+        }
+      }
+
+      const inp = {
+        width:"100%", padding:"13px 16px", fontSize:15,
+        border:`1.5px solid ${C.border}`, borderRadius:10,
+        background:C.white, color:"#111", fontFamily:"inherit",
+        outline:"none", boxSizing:"border-box",
+      };
+      const btn = {
+        width:"100%", padding:"15px 24px", fontSize:15, fontWeight:700,
+        background:C.sky, color:C.white, border:"none", borderRadius:10,
+        cursor:"pointer", fontFamily:"inherit",
+      };
+
+      return (
+        <div style={{minHeight:"100vh",background:C.navy,fontFamily:"'DM Sans',system-ui,sans-serif"}}>
+
+          {/* Topbar */}
+          <div style={{borderBottom:"1px solid rgba(255,255,255,0.08)",padding:"16px 24px",
+            display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div>
+              <a href="index.html" style={{fontFamily:"'Syne',sans-serif",fontWeight:800,
+                fontSize:18,color:C.white,textDecoration:"none"}}>
+                Idep<span style={{color:C.sky}}>lement</span>
+              </a>
+              <span style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginLeft:10,
+                letterSpacing:"0.08em"}}>FREE WEBSITE GRADER</span>
+            </div>
+            <span style={{fontSize:12,color:"rgba(255,255,255,0.4)"}}>Powered by Ideplement</span>
+          </div>
+
+          <div style={{maxWidth:560,margin:"0 auto",padding:"40px 20px 60px"}}>
+
+            {/* Hero — steps 0 and 1 */}
+            {step <= 1 && (
+              <div style={{textAlign:"center",marginBottom:36}}>
+                <div style={{display:"inline-block",background:"rgba(242,100,25,0.15)",
+                  border:"1px solid rgba(242,100,25,0.3)",borderRadius:20,padding:"4px 14px",
+                  fontSize:12,color:C.sky,fontWeight:600,letterSpacing:"0.06em",marginBottom:16}}>
+                  FREE · INSTANT · NO CREDIT CARD
+                </div>
+                <h1 style={{fontFamily:"'Syne',sans-serif",fontSize:34,fontWeight:800,color:C.white,
+                  lineHeight:1.15,margin:"0 0 14px"}}>
+                  Is your website<br /><span style={{color:C.sky}}>losing you leads?</span>
+                </h1>
+                <p style={{fontSize:15,color:"rgba(255,255,255,0.55)",lineHeight:1.65,margin:0}}>
+                  Get an instant AI-powered grade across 5 key areas. See exactly where you're leaving money on the table.
+                </p>
+              </div>
+            )}
+
+            {step <= 1 && <Steps current={step} />}
+
+            {/* Step 0 — URL */}
+            {step === 0 && (
+              <div style={{background:C.white,borderRadius:16,padding:"28px 28px 24px",
+                boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}}>
+                <label style={{display:"block",fontSize:13,fontWeight:600,color:C.slate,
+                  marginBottom:8,letterSpacing:"0.04em"}}>YOUR WEBSITE URL</label>
+                <input style={inp} placeholder="https://yourbusiness.com" value={url}
+                  onChange={e => { setUrl(e.target.value); setUrlError(""); }}
+                  onKeyDown={e => e.key === "Enter" && validateUrl() && setStep(1)} />
+                {urlError && <p style={{color:C.red,fontSize:12,margin:"8px 0 0"}}>{urlError}</p>}
+                <button style={{...btn,marginTop:16}} onClick={() => validateUrl() && setStep(1)}>
+                  Grade My Website →
+                </button>
+                <p style={{textAlign:"center",fontSize:12,color:C.muted,marginTop:14}}>
+                  Takes about 15 seconds · Used by 500+ business owners
+                </p>
+              </div>
+            )}
+
+            {/* Step 1 — Info */}
+            {step === 1 && (
+              <div style={{background:C.white,borderRadius:16,padding:"28px 28px 24px",
+                boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}}>
+                <p style={{fontSize:13,color:C.slate,marginBottom:6}}>
+                  Analyzing: <span style={{color:C.sky,fontWeight:600,wordBreak:"break-all"}}>{url}</span>
+                </p>
+                <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:800,
+                  color:"#111",margin:"0 0 6px"}}>Where should we send your report?</h2>
+                <p style={{fontSize:13,color:C.muted,margin:"0 0 20px",lineHeight:1.5}}>
+                  Enter your info to unlock your grade, your #1 quick win, and a copy emailed to your inbox.
+                </p>
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  <input style={inp} placeholder="Your name" value={name}
+                    onChange={e => { setName(e.target.value); setInfoError(""); }} />
+                  <input style={inp} placeholder="Business email" type="email" value={email}
+                    onChange={e => { setEmail(e.target.value); setInfoError(""); }} />
+                  <input style={inp} placeholder="Company name (optional)" value={company}
+                    onChange={e => setCompany(e.target.value)} />
+                </div>
+                {infoError && <p style={{color:C.red,fontSize:12,margin:"10px 0 0"}}>{infoError}</p>}
+                <button style={{...btn,marginTop:16}} onClick={() => validateInfo() && analyze()}>
+                  Unlock My Free Report →
+                </button>
+                <p style={{textAlign:"center",fontSize:11,color:C.muted,marginTop:12,lineHeight:1.5}}>
+                  🔒 No spam. Your report will be emailed to you instantly.
+                </p>
+              </div>
+            )}
+
+            {/* Step 2 — Analyzing */}
+            {step === 2 && (
+              <div style={{textAlign:"center",padding:"60px 20px"}}>
+                <div style={{width:80,height:80,borderRadius:"50%",
+                  border:"3px solid rgba(242,100,25,0.2)",
+                  borderTop:`3px solid ${C.sky}`,
+                  animation:"spin 1s linear infinite",margin:"0 auto 28px"}} />
+                <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:22,fontWeight:800,
+                  color:C.white,margin:"0 0 12px"}}>Analyzing your website...</h2>
+                <p style={{color:C.sky,fontSize:14,fontWeight:500,minHeight:22}}>{typing}</p>
+                <p style={{color:"rgba(255,255,255,0.3)",fontSize:12,marginTop:20}}>
+                  This takes about 15 seconds
+                </p>
+              </div>
+            )}
+
+            {/* Step 3 — Report */}
+            {step === 3 && report && <Report report={report} />}
+
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
